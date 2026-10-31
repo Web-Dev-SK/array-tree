@@ -127,6 +127,15 @@ for (const {index, removed, inserted} of tree.collapseNode(node)) {
 
 `getArray()` returns a live reference that is modified in place. `setNewTree` replaces it with a new array, so read it again afterwards. After `expandNodeAndParents`, which may return several insertions, it is simpler to resync with the whole array.
 
+## Containers
+
+Any node can become a container: if the target of `insertNode` or a move has no children
+array, it is created automatically. The library does not restrict which nodes may have
+children. If some nodes must stay leaves, check it in your code before calling.
+
+`isNodeContainer(node)` tells whether the node has a children array right now.
+Removing the last child leaves an empty array, so the node remains a container.
+
 ## API
 
 ### Creating and reading
@@ -190,7 +199,6 @@ tree.getTree().children;
 ```
 
 Exported types: `IArrayItem`, `IArrayChange`, `IArrayTreeOptions`.
-
 
 ## Things to know
 
