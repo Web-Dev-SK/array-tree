@@ -45,7 +45,6 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
     this.parentFieldName = options?.parentFieldName ?? '_x_parent';
     this.idFieldName = options?.idFieldName ?? '_x_id';
     this.includeRoot = options?.includeRoot ?? true;
-    this.assertRoot(tree);
     this.tree = tree;
     this.setTreeRequires(tree);
     this.array = [];
@@ -76,7 +75,9 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
    *  nodes can be reused elsewhere. Ignored if the same tree is passed again.
    */
   public setNewTree(tree: TRoot, includeRoot: boolean = this.includeRoot, clearServices: boolean = false) {
-    this.assertRoot(tree);
+    if (!Array.isArray(this.getChildren(tree))) {
+      this.setChildren(tree, []);
+    }
     if (clearServices && tree !== this.tree) {
       this.clearServiceFields(this.tree);
     }
@@ -584,12 +585,6 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
       return true;
     }
     return (this.getChildren(node) ?? []).some(c => this.hasIds(c));
-  }
-
-  private assertRoot(tree: TRoot) {
-    if (!Array.isArray(this.getChildren(tree))) {
-      throw new Error(`Root must have an array in field "${this.childrenFieldName}"`);
-    }
   }
 
   //ACCESSORS
