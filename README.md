@@ -55,6 +55,11 @@ tree.insertNode({name: 'README.md'}, root);
 
 **Root modes.**
 
+| `includeRoot` | Array |
+|---|---|
+| `true` (default) | The root is the first item (depth 0), its children start at depth 1. The root can be collapsed. |
+| `false` | The root is virtual: it is not in the array, top-level nodes have depth 0, and its `collapsed` flag is ignored. |
+
 ## Array items
 
 `getArray()` returns items of type `IArrayItem`:
@@ -185,7 +190,7 @@ tree.getTree().children;
 ```
 
 Exported types: `IArrayItem`, `IArrayChange`, `IArrayTreeOptions`.
-s
+
 
 ## Things to know
 

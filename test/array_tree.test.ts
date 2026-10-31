@@ -82,7 +82,7 @@ function check(at: ArrayTree<N>, includeRoot: boolean) {
     expect(inArray.has(item.node)).toBe(false);
     inArray.add(item.node);
     expect(at.getIndex(item.node)).toBe(i);
-    expect(item['_x_id']).toBe(at.getNodeId(item.node));
+    expect(item.id).toBe(at.getNodeId(item.node));
   });
 
   const ids = new Set<number>();
@@ -206,7 +206,7 @@ describe('constructor', () => {
     const arr = at.getArray();
     expect(arr[0].node).toBe(get('A'));
     expect(arr[1].node).toBe(get('A1'));
-    expect(arr[0]['_x_id']).not.toBe(arr[1]['_x_id']);
+    expect(arr[0].id).not.toBe(arr[1].id);
   });
 
   it('ignores the collapsed flag of a virtual root', () => {
@@ -248,7 +248,8 @@ describe('constructor', () => {
     expect(at.getArray().map(i => i.node.title)).toEqual(['a', 'c']);
     const a = root.kids![0] as any;
     const item = at.getArray()[0];
-    expect(item['key']).toBe(at.getNodeId(a));
+    expect(item.id).toBe(at.getNodeId(a));
+    expect(item.id).toBe(a.uid);
     expect(a.up).toBe(root);
     expect(a.ix).toBe(0);
     expect('_x_parent' in a).toBe(false);

@@ -36,7 +36,8 @@
     "prepublishOnly": "npm run check && npm test"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "tag": "beta"
   },
   "devDependencies": {
     "rimraf": "^6.1.3",

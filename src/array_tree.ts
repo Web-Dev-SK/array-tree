@@ -12,6 +12,8 @@ import {getId} from "./ids_factory.js";
  * Methods that change the array return `IArrayChange[]`. Apply the changes in order: the index of
  * each change refers to the array state after the previous one.
  *
+ * @see {@link https://github.com/Web-Dev-SK/array-tree#readme Documentation}
+ *
  * @template TNode - type of any node of the tree (a union if there are several kinds)
  * @template TRoot - type of the root; `getTree()` returns it
  */
