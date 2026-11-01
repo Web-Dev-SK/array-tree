@@ -74,9 +74,6 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
    *  nodes can be reused elsewhere. Ignored if the same tree is passed again.
    */
   public setNewTree(tree: TRoot, includeRoot: boolean = this.includeRoot, clearServices: boolean = false) {
-    if (!Array.isArray(this.getChildren(tree))) {
-      this.setChildren(tree, []);
-    }
     if (clearServices && tree !== this.tree) {
       this.clearServiceFields(this.tree);
     }
@@ -88,7 +85,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
 
   /**
    * Returns the ancestor of the node (or the node itself) that is a direct child of the root.
-   * For the root returns the root. Typed as TNode, check with isRoot.
+   * For the root returns the root. Typed as `TNode`, check with `isRoot`.
    */
   public getTopNonRootNode(node: TNode | TRoot): TNode {
     let cur: TNode | TRoot = node;
