@@ -30,10 +30,10 @@
   },
   "scripts": {
     "build": "rimraf dist && tsc",
-    "typecheck": "tsc --noEmit",
-    "check": "npm run typecheck && npm run build",
+    "typecheck": "tsc --noEmit -p tsconfig.test.json",
+    "check": "npm run typecheck && npm test && npm run build",
     "test": "vitest run",
-    "prepublishOnly": "npm run check && npm test"
+    "prepublishOnly": "npm run check"
   },
   "publishConfig": {
     "access": "public",
