@@ -60,6 +60,8 @@ tree.insertNode({name: 'README.md'}, root);
 | `true` (default) | The root is the first item (depth 0), its children start at depth 1. The root can be collapsed. |
 | `false` | The root is virtual: it is not in the array, top-level nodes have depth 0, and its `collapsed` flag is ignored. |
 
+**Mutation in place.** The tree you pass is not copied. If you need to keep the original, clone it first.
+
 ## Array items
 
 `getArray()` returns items of type `IArrayItem`:
@@ -79,13 +81,6 @@ interface IArrayItem<TNode extends object> {
 | `id` | Unique number greater than 0. Use it as a list key or pass the array straight to libraries that expect items with an `id` |
 
 Items are read-only. Do not modify them or the array: it is updated by the library's methods (see "Working with changes").
-
-| `includeRoot` | Array                                                                                                           |
-|---|---|
-| `true` (default) | The root is the first item (depth 0), its children start at depth 1. The root can be collapsed.                 |
-| `false` | The root is virtual: it is not in the array, top-level nodes have depth 0, and its `collapsed` flag is ignored. |
-
-**Mutation in place.** The tree you pass is not copied. If you need to keep the original, clone it first.
 
 ## Options
 
@@ -120,6 +115,7 @@ A change works like `Array.prototype.splice`. When there are several changes, ap
 If you render straight from `getArray()`, you only need to re-render. For an incremental update, the inserted items are `tree.getArray().slice(index, index + inserted)`:
 
 ```ts
+// `mirror` is your own copy of the array (for example, the rows of a view)
 for (const {index, removed, inserted} of tree.collapseNode(node)) {
   mirror.splice(index, removed, ...tree.getArray().slice(index, index + inserted));
 }
@@ -140,12 +136,12 @@ Removing the last child leaves an empty array, so the node remains a container.
 
 ### Creating and reading
 
-| Method | Description |
-|---|---|
-| `new ArrayTree(tree, options?)` | Adopts the tree and builds the array |
-| `getArray()` | Flat array of visible items (live reference) |
-| `getTree()` | The root node |
-| `setNewTree(tree, includeRoot?, clearServices?)` | Replaces the tree and rebuilds the array. Slow: walks the whole tree. `includeRoot` keeps the current mode if omitted. With `clearServices` the previous tree's service fields are cleared so its nodes can be reused elsewhere |
+| Method | Description                                                                                                                                                                                                                                                                 |
+|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `new ArrayTree(tree, options?)` | Adopts the tree and builds the array                                                                                                                                                                                                                                        |
+| `getArray()` | Flat array of visible items (live reference)                                                                                                                                                                                                                                |
+| `getTree()` | The root node                                                                                                                                                                                                                                                               |
+| `setNewTree(tree, includeRoot?, clearServices?)` | Replaces the tree and rebuilds the array. Slow: walks the whole tree. `includeRoot` keeps the current mode if omitted. With `clearServices` the previous tree's service fields are cleared so its nodes can be reused elsewhere; nodes shared with the new tree get new ids |
 
 ### Expanding and collapsing
 
@@ -159,44 +155,61 @@ The flag is set or cleared even if the node itself is not visible. The root can 
 
 ### Changing the tree
 
-| Method | Description |
-|---|---|
+| Method | Description                                                                                                                                                     |
+|---|-----------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `insertNode(node, target, index?)` | Inserts a **new** node with its subtree into the target's children. Out-of-range or omitted index means the end. Throws if the node or any descendant already has an id |
 | `deleteNode(node, dontReindex?)` | Removes the node with its subtree. Service fields of the whole subtree are cleared, your data is kept, so the node can be inserted again. The root cannot be deleted. With `dontReindex` the indexes of following items stay stale until you call `reindexFromNode` |
-| `moveNodeToIndex(node, target, index)` | Moves the node into the target. The index is counted after the node is removed from its old parent |
-| `moveNodeRelative(node, reference, position)` | Moves the node `"before"`, `"after"` or `"inside"` (as the last child) relative to the reference node |
-| `canMoveNode(node, target)` | `false` for the root and for moving a node into itself or its descendant |
-| `reindexFromNode(node)` | Refreshes array indexes starting from the node (after `deleteNode(..., true)`) |
+| `moveNodeToIndex(node, target, index)` | Moves the node into the target. The index is counted after the node is removed from its old parent                                                              |
+| `moveNodeRelative(node, reference, position)` | Moves the node `"before"`, `"after"` or `"inside"` (as the last child) of the reference node. Returns `null` for `"before"`/`"after"` with the root as reference|
+| `canMoveNode(node, target)` | `false` for the root and for moving a node into itself or its descendant                                                                                        |
+| `reindexFromNode(node)` | Refreshes array indexes starting from the node (after `deleteNode(..., true)`)                                                                                  |
 
 Moves return `null` when they are not allowed, otherwise up to two changes: the removal, then the insertion. If the insertion throws, the previous state is restored and the error is rethrown. Ids and parents are preserved by moves.
 
 ### Reading nodes
 
-| Method | Description |
-|---|---|
-| `getParent(node)` | Parent; `null` for the root, `undefined` if the node is not in the tree |
-| `getNodeId(node)` | Id; `undefined` if the node is not in the tree |
-| `getIndex(node)` | Position in the array, or `undefined` if the node is not visible |
-| `getChildren(node)` | Children array (live reference) |
-| `isCollapsed(node)` / `isFiltered(node)` | The flags |
-| `isNodeContainer(node)` | Whether the node has a children array (an empty one counts) |
-| `isNodeParentOf(ancestor, node)` | `true` if `ancestor` is the node itself or one of its ancestors |
-| `getTopNonRootNode(node)` | The ancestor (or the node itself) that is a direct child of the root |
+| Method | Description                                                                   |
+|---|-------------------------------------------------------------------------------|
+| `getParent(node)` | Parent (the root for top-level nodes, check with `isRoot`); `null` for the root, `undefined` if detached |
+| `getNodeId(node)` | Id; `undefined` if the node is not in the tree                                |
+| `getIndex(node)` | Position in the array, or `undefined` if the node is not visible              |
+| `getChildren(node)` | Children array or `undefined`                                                 |
+| `isCollapsed(node)` / `isFiltered(node)` | The flags                                                                     |
+| `isNodeContainer(node)` | Whether the node has a children array (an empty one counts)                   |
+| `isNodeParentOf(ancestor, node)` | `true` if `ancestor` is the node itself or one of its ancestors               |
+| `getTopNonRootNode(node)` | The top-level ancestor of the node (the node itself if it is top-level); the root for the root|
+| `isRoot(node)` | `true` if the node is the root of this tree (type guard, narrows to TRoot)      |
 
 ## TypeScript
 
 ```ts
-class ArrayTree<TNode extends object = {}>
+class ArrayTree<TNode extends object = {}, TRoot extends object = TNode>
 ```
 
-`TNode` is the type of any node (use a union if there are several kinds),  returns:
+- `TNode` is the type of any non-root node (use a union if there are several kinds).
+- `TRoot` is the type of the root. It does not have to extend `TNode`, so the root can carry its
+  own state and does not need the fields of the nodes. `getTree()` returns it. If omitted, it
+  equals `TNode`.
 
 ```ts
-type Node = RootNode | FolderNode | FileNode;
+type Node = FolderNode | FileNode;
 
-const tree = new ArrayTree<Node>(rootNode);
-tree.getTree().children;
+interface Root {
+  children: Node[];
+  selected: Node | null;
+  loading: boolean;
+}
+
+const tree = new ArrayTree<Node, Root>(root);
+tree.getTree().selected;
 ```
+
+Methods that read or toggle nodes, and the target of insert and move, accept `TNode | TRoot`.
+The node being inserted, deleted or moved is `TNode`: the root cannot be moved or deleted.
+
+Results are typed as `TNode`, although the root can appear there: the first item of
+`getArray()` with `includeRoot: true`, and `getParent` of a top-level node. Use `isRoot(node)`
+to tell them apart.
 
 Exported types: `IArrayItem`, `IArrayChange`, `IArrayTreeOptions`.
 
@@ -205,7 +218,7 @@ Exported types: `IArrayItem`, `IArrayChange`, `IArrayTreeOptions`.
 - **Reading is cheap, writing is in place.** Do not edit service fields by hand, and do not change `collapsed` or `filtered` directly on nodes that are in the array; use the methods, or rebuild with `setNewTree(tree)`.
 - **Stale indexes.** `getIndex` verifies that the item at the stored index is really the node, so it returns `undefined` instead of a wrong position when the index is outdated.
 - **An id is a sign of being in the tree.** That is why `insertNode` rejects nodes that already have one. To relocate a node that is already in the tree, use `moveNodeToIndex` or `moveNodeRelative`.
-- **Insert into a hidden place.** Inserting into a collapsed, filtered changes the tree only and returns `[]`.
+- **Insert into a hidden place.** Inserting into a collapsed or filtered node changes the tree only and returns `[]`.
 - **The array is mutated in place.** `getArray()` keeps the same reference after expand/collapse/insert/delete/move, so frameworks that compare by reference will not notice the change. Keep a version counter in your state and bump it after each call that returns changes.
 
 ## TODO
