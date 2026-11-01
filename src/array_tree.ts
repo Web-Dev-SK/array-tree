@@ -47,7 +47,6 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
     this.includeRoot = options?.includeRoot ?? true;
     this.tree = tree;
     this.setTreeRequires(tree);
-    this.array = [];
     this.rebuildArray();
   }
 
@@ -89,9 +88,9 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
 
   /**
    * Returns the ancestor of the node (or the node itself) that is a direct child of the root.
-   * For the root returns the root.
+   * For the root returns the root. Typed as TNode, check with isRoot.
    */
-  public getTopNonRootNode(node: TNode | TRoot) {
+  public getTopNonRootNode(node: TNode | TRoot): TNode {
     let cur: TNode | TRoot = node;
     let parent = this.getParent(cur);
     while (parent && this.getParent(parent)) {
@@ -304,6 +303,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> 
     }
   }
 
+  /** Whether the node is the root of this tree. Type guard: narrows to TRoot. */
   public isRoot(node: TNode | TRoot): node is TRoot {
     return (node as object) === this.tree;
   }
