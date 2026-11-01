@@ -17,7 +17,7 @@ import {getId} from "./ids_factory.js";
  * @template TNode - type of any node of the tree (a union if there are several kinds)
  * @template TRoot - type of the root; `getTree()` returns it
  */
-export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
+export class ArrayTree<TNode extends object = {}, TRoot extends object = TNode> {
   private array: IArrayItem<TNode>[] = [];
   private tree: TRoot;
   private readonly childrenFieldName: string;
@@ -47,7 +47,6 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     this.includeRoot = options?.includeRoot ?? true;
     this.tree = tree;
     this.setTreeRequires(tree);
-    this.array = [];
     this.rebuildArray();
   }
 
@@ -86,16 +85,16 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
 
   /**
    * Returns the ancestor of the node (or the node itself) that is a direct child of the root.
-   * For the root returns the root.
+   * For the root returns the root. Typed as `TNode`, check with `isRoot`.
    */
-  public getTopNonRootNode(node: TNode) {
-    let cur = node;
+  public getTopNonRootNode(node: TNode | TRoot): TNode {
+    let cur: TNode | TRoot = node;
     let parent = this.getParent(cur);
     while (parent && this.getParent(parent)) {
       cur = parent;
       parent = this.getParent(cur);
     }
-    return cur;
+    return cur as TNode;
   }
 
   /**
@@ -105,7 +104,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * @returns the removed range, or `[]` if the node cannot be toggled, is already collapsed,
    *   is not visible, or has no visible descendants
    */
-  public collapseNode(node: TNode): IArrayChange[] {
+  public collapseNode(node: TNode | TRoot): IArrayChange[] {
     if (!this.canToggle(node) || this.isCollapsed(node)) {
       return [];
     }
@@ -134,7 +133,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * @returns the inserted range, or `[]` if the node cannot be toggled, is not collapsed,
    *   is not visible, or has nothing to show
    */
-  public expandNode(node: TNode): IArrayChange[] {
+  public expandNode(node: TNode | TRoot): IArrayChange[] {
     if (!this.canToggle(node) || !this.isCollapsed(node)) {
       return [];
     }
@@ -166,7 +165,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * @returns the inserted range, or `[]` if the array did not change
    * @throws if the node or any descendant already has an id
    */
-  public insertNode(node: TNode, targetNode: TNode, index?: number): IArrayChange[] {
+  public insertNode(node: TNode, targetNode: TNode | TRoot, index?: number): IArrayChange[] {
     if (this.hasIds(node)) {
       throw new Error("It is impossible to insert a node that has an id");
     }
@@ -198,7 +197,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * Whether `node` can be moved into `targetNode`: it must not be the root, and the target must
    * not be the node itself or its descendant.
    */
-  public canMoveNode(node: TNode, targetNode: TNode): boolean {
+  public canMoveNode(node: TNode, targetNode: TNode | TRoot): boolean {
     return !!this.getParent(node) && !this.isNodeParentOf(node, targetNode);
   }
 
@@ -213,7 +212,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    *   the removal). A hidden node or a hidden target yields fewer changes.
    *   If the insertion throws, the old state is restored and the error is rethrown.
    */
-  public moveNodeToIndex(node: TNode, targetNode: TNode, index: number): IArrayChange[] | null {
+  public moveNodeToIndex(node: TNode, targetNode: TNode | TRoot, index: number): IArrayChange[] | null {
     return this.moveTo(node, targetNode, () => index);
   }
 
@@ -221,10 +220,10 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * Whether `targetNode` is `node` itself or one of its ancestors.
    * Note the argument order: the potential ancestor goes first.
    */
-  public isNodeParentOf(targetNode: TNode, node: TNode) {
-    let cur: TNode | null | undefined = node;
+  public isNodeParentOf(targetNode: TNode | TRoot, node: TNode | TRoot) {
+    let cur: TNode | TRoot | null | undefined = node;
     while (cur) {
-      if (cur === targetNode) {
+      if ((cur as object) === targetNode) {
         return true;
       }
       cur = this.getParent(cur);
@@ -233,7 +232,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
   }
 
   /** Children array of the node (live reference), or `undefined` if the node has none. */
-  public getChildren(node: TNode): TNode[] | undefined {
+  public getChildren(node: TNode | TRoot): TNode[] | undefined {
     return (node as AnyNode)[this.childrenFieldName];
   }
 
@@ -246,19 +245,23 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * @returns `null` if `node === referenceNode`, if `referenceNode` is the root with
    *   `"before"`/`"after"`, or if the move is not allowed; otherwise as in `moveNodeToIndex`
    */
-  public moveNodeRelative(node: TNode, referenceNode: TNode, position: MovePosition): IArrayChange[] | null {
-    if (node === referenceNode) {
+  public moveNodeRelative(node: TNode, referenceNode: TNode | TRoot, position: MovePosition): IArrayChange[] | null {
+    if ((node as object) === referenceNode) {
       return null;
     }
     if (position === "inside") {
       return this.moveTo(node, referenceNode, () => undefined);
     }
-    const parent = this.getParent(referenceNode);
+    if (this.isRoot(referenceNode)) {
+      return null;
+    }
+    const ref = referenceNode;
+    const parent = this.getParent(ref);
     if (!parent) {
       return null;
     }
     return this.moveTo(node, parent, () => {
-      const i = this.getChildren(parent)!.indexOf(referenceNode);
+      const i = this.getChildren(parent)!.indexOf(ref);
       return position === "before" ? i : i + 1;
     });
   }
@@ -268,7 +271,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * collapsed. Use it to reveal a node.
    * @returns the changes of every expansion, in the order they must be applied
    */
-  public expandNodeAndParents(node: TNode) {
+  public expandNodeAndParents(node: TNode | TRoot) {
     const changes: IArrayChange[] = [];
     const path = this.getPathToRoot(node);
     while (path.length > 0) {
@@ -281,7 +284,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
   }
 
   /** Whether the node has a children array (an empty array counts as a container). */
-  public isNodeContainer(node: TNode) {
+  public isNodeContainer(node: TNode | TRoot) {
     return Array.isArray(this.getChildren(node));
   }
 
@@ -290,11 +293,16 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * Needed after `deleteNode(..., true)`. Does nothing if the node is not in the array,
    * so pass a node that is still visible.
    */
-  public reindexFromNode(node: TNode) {
+  public reindexFromNode(node: TNode | TRoot) {
     const index = this.getIndex(node);
     if (index !== undefined && index > -1) {
       this.reindexNodesFrom(index);
     }
+  }
+
+  /** Whether the node is the root of this tree. Type guard: narrows to TRoot. */
+  public isRoot(node: TNode | TRoot): node is TRoot {
+    return (node as object) === this.tree;
   }
 
   //Private
@@ -311,19 +319,19 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     this.array = arr;
   }
 
-  private createNewItem(node: TNode, depth: number): IArrayItem<TNode> {
+  private createNewItem(node: TNode | TRoot, depth: number): IArrayItem<TNode> {
     const id = this.getNodeId(node);
     if (id === undefined) {
       throw new Error("Node has no id");
     }
-    return {node, depth, id};
+    return {node: node as TNode, depth, id};
   }
 
-  private canToggle(node: TNode): boolean {
-    return node === this.tree ? this.includeRoot : !!this.getParent(node);
+  private canToggle(node: TNode | TRoot): boolean {
+    return this.isRoot(node) ? this.includeRoot : !!this.getParent(node);
   }
 
-  private clearServiceFields(node: TNode) {
+  private clearServiceFields(node: TNode | TRoot) {
     this.setNodeId(node, undefined);
     this.setParent(node, undefined);
     this.clearIndex(node);
@@ -365,7 +373,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     return result;
   }
 
-  private moveTo(node: TNode, target: TNode, resolveIndex: () => number | undefined): IArrayChange[] | null {
+  private moveTo(node: TNode, target: TNode | TRoot, resolveIndex: () => number | undefined): IArrayChange[] | null {
     if (!this.canMoveNode(node, target)) {
       return null;
     }
@@ -394,7 +402,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     return changes;
   }
 
-  private setTreeRequires(node: TNode, parent?: TNode) {
+  private setTreeRequires(node: TNode | TRoot, parent?: TNode | TRoot) {
     this.setParent(node, parent ?? null);
     this.clearIndex(node);
     if (this.getNodeId(node) === undefined) {
@@ -408,8 +416,8 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     }
   }
 
-  private getAllChildrenArray(array: IArrayItem<TNode>[], node: TNode, depth: number) {
-    const isVirtualRoot = node === this.tree && !this.includeRoot;
+  private getAllChildrenArray(array: IArrayItem<TNode>[], node: TNode | TRoot, depth: number) {
+    const isVirtualRoot = this.isRoot(node) && !this.includeRoot;
     if (this.isFiltered(node) || (!isVirtualRoot && this.isCollapsed(node))) {
       return;
     }
@@ -433,8 +441,8 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
     }
   }
 
-  private getPathToRoot(node: TNode) {
-    const arr = [node]
+  private getPathToRoot(node: TNode | TRoot) {
+    const arr = [node];
     let parent = this.getParent(node);
     while (parent) {
       arr.push(parent)
@@ -468,7 +476,7 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
 
   private insertNodeInternal(
     node: TNode,
-    targetNode: TNode,
+    targetNode: TNode | TRoot,
     index?: number,
     dontReindex?: boolean
   ) {
@@ -492,9 +500,8 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
 
     //ARRAY
     const nodeFiltered = this.isFiltered(node);
-    const insertToRoot = !this.includeRoot && targetNode === this.tree;
-    const targetVisible = insertToRoot
-      || this.getIndex(targetNode) !== undefined;
+    const insertToRoot = !this.includeRoot && this.isRoot(targetNode);
+    const targetVisible = insertToRoot || this.getIndex(targetNode) !== undefined;
     if (!nodeFiltered
       && targetVisible
       && (insertToRoot || !this.isCollapsed(targetNode))
@@ -578,8 +585,10 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
   }
 
   //ACCESSORS
-  /** Parent of the node: `null` for the root, `undefined` if the node is not in the tree. */
-  public getParent(node: TNode): TNode | null | undefined {
+  /** Parent of the node: `null` for the root, `undefined` if detached.
+   *  For a top-level node this is the root itself (typed as TNode): check with `isRoot`.
+   */
+  public getParent(node: TNode | TRoot): TNode | null | undefined {
     return (node as AnyNode)[this.parentFieldName];
   }
 
@@ -588,47 +597,47 @@ export class ArrayTree<TNode extends object = {}, TRoot extends TNode = TNode> {
    * (collapsed or filtered ancestor, filtered itself, root without `includeRoot`, detached)
    * or its stored index is stale.
    */
-  public getIndex(node: TNode): number | undefined {
+  public getIndex(node: TNode | TRoot): number | undefined {
     const res = (node as AnyNode)[this.indexNodeFieldName];
-    return res !== undefined && this.array[res]?.node === node ? res : undefined;
+    return res !== undefined && (this.array[res]?.node as object) === node ? res : undefined;
   }
 
   /** Id of the node, or `undefined` if the node is not in the tree (never inserted or deleted). */
-  public getNodeId(node: TNode): number | undefined {
+  public getNodeId(node: TNode | TRoot): number | undefined {
     return (node as AnyNode)[this.idFieldName];
   }
 
   /** Whether the node's collapsed flag is set. */
-  public isCollapsed(node: TNode): boolean {
+  public isCollapsed(node: TNode | TRoot): boolean {
     return !!(node as AnyNode)[this.collapsedFieldName];
   }
 
   /** Whether the node's filtered flag is set. */
-  public isFiltered(node: TNode): boolean {
+  public isFiltered(node: TNode | TRoot): boolean {
     return !!(node as AnyNode)[this.filteredFieldName];
   }
 
-  private setChildren(node: TNode, children: TNode[]): void {
+  private setChildren(node: TNode | TRoot, children: TNode[]): void {
     (node as AnyNode)[this.childrenFieldName] = children;
   }
 
-  private setParent(node: TNode, parent: TNode | null | undefined): void {
+  private setParent(node: TNode | TRoot, parent: TNode | TRoot | null | undefined): void {
     (node as AnyNode)[this.parentFieldName] = parent;
   }
 
-  private setIndex(node: TNode, index: number): void {
+  private setIndex(node: TNode | TRoot, index: number): void {
     (node as AnyNode)[this.indexNodeFieldName] = index;
   }
 
-  private clearIndex(node: TNode): void {
+  private clearIndex(node: TNode | TRoot): void {
     (node as AnyNode)[this.indexNodeFieldName] = undefined; // not delete: keeps the object shape stable
   }
 
-  private setNodeId(node: TNode, id: number | undefined): void {
+  private setNodeId(node: TNode | TRoot, id: number | undefined): void {
     (node as AnyNode)[this.idFieldName] = id;
   }
 
-  private setCollapsed(node: TNode, value: boolean): void {
+  private setCollapsed(node: TNode | TRoot, value: boolean): void {
     (node as AnyNode)[this.collapsedFieldName] = value;
   }
 

@@ -1153,3 +1153,106 @@ describe('randomized operations keep the array consistent', () => {
     }
   });
 });
+
+describe('separate TRoot type', () => {
+  interface M { name: string; data?: M[]; collapsed?: boolean }
+  interface R { data: M[]; selected: M | null; loading: boolean }
+
+  const m = (name: string, data?: M[]): M => ({name, ...(data ? {data} : {})});
+  const mkRoot = (): R => ({
+    data: [m('A', [m('A1')]), m('B')],
+    selected: null,
+    loading: false,
+  });
+  const names = (at: ArrayTree<M, R>) => at.getArray().map(i => `${i.node.name}:${i.depth}`);
+
+  it('builds the array without requiring root fields from TNode', () => {
+    const at = new ArrayTree<M, R>(mkRoot(), {includeRoot: false, childrenFieldName: 'data'});
+    expect(names(at)).toEqual(['A:0', 'A1:1', 'B:0']);
+    expect(at.getTree().loading).toBe(false);
+  });
+
+  it('isRoot distinguishes the root from nodes', () => {
+    const root = mkRoot();
+    const at = new ArrayTree<M, R>(root, {childrenFieldName: 'data'});
+    expect(at.isRoot(root)).toBe(true);
+    expect(at.isRoot(root.data[0])).toBe(false);
+  });
+
+  it('isRoot is false for the old root after setNewTree', () => {
+    const old = mkRoot();
+    const at = new ArrayTree<M, R>(old, {childrenFieldName: 'data'});
+    at.setNewTree(mkRoot());
+    expect(at.isRoot(old)).toBe(false);
+  });
+
+  it('getParent of a top-level node is the root', () => {
+    const root = mkRoot();
+    const at = new ArrayTree<M, R>(root, {childrenFieldName: 'data'});
+    const parent = at.getParent(root.data[0])!;
+    expect(parent).toBe(root);
+    expect(at.isRoot(parent)).toBe(true);
+  });
+
+  it('with includeRoot the first item holds the root', () => {
+    const root = mkRoot();
+    const at = new ArrayTree<M, R>(root, {includeRoot: true, childrenFieldName: 'data'});
+    const first = at.getArray()[0];
+    expect(first.depth).toBe(0);
+    expect(at.isRoot(first.node)).toBe(true);
+  });
+
+  it('insert and move into the root work', () => {
+    const root = mkRoot();
+    const at = new ArrayTree<M, R>(root, {includeRoot: false, childrenFieldName: 'data'});
+    at.insertNode(m('X'), root, 0);
+    at.moveNodeToIndex(root.data[1].data![0], root, 0); // A1 -> root start
+    expect(names(at)).toEqual(['A1:0', 'X:0', 'A:0', 'B:0']);
+  });
+
+  it('root state is untouched by tree operations', () => {
+    const root = mkRoot();
+    root.loading = true;
+    const at = new ArrayTree<M, R>(root, {childrenFieldName: 'data'});
+    at.insertNode(m('X'), root);
+    expect(root.loading).toBe(true);
+    expect(root.selected).toBeNull();
+  });
+});
+
+describe('root without a children array', () => {
+  const bare = (): N => ({name: 'root'});
+
+  it('constructor does not create the array', () => {
+    const root = bare();
+    const at = new ArrayTree<N>(root, {includeRoot: true});
+    expect(flat(at)).toEqual(['root:0']);
+    expect(root.children).toBeUndefined();
+    expect(at.isNodeContainer(root)).toBe(false);
+  });
+
+  it('includeRoot: false gives an empty array', () => {
+    const root = bare();
+    const at = new ArrayTree<N>(root, {includeRoot: false});
+    expect(flat(at)).toEqual([]);
+    expect(root.children).toBeUndefined();
+  });
+
+  it('setNewTree does not create the array either', () => {
+    const {at} = make();
+    const root = bare();
+    at.setNewTree(root);
+    expect(root.children).toBeUndefined();
+    expect(flat(at)).toEqual([]);
+  });
+
+  it.each([false, true])('the first insert creates it (includeRoot=%s)', (includeRoot) => {
+    const root = bare();
+    const at = new ArrayTree<N>(root, {includeRoot});
+    const x = n('X');
+    at.insertNode(x, root);
+    expect(root.children).toEqual([x]);
+    expect(at.isNodeContainer(root)).toBe(true);
+    check(at, includeRoot);
+  });
+});
