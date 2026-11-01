@@ -26,7 +26,7 @@
   "homepage": "https://github.com/Web-Dev-SK/array-tree",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Web-Dev-SK/array-tree.git"
+    "url": "git+https://github.com/Web-Dev-SK/array-tree.git"
   },
   "scripts": {
     "clean": "node scripts/clean.mjs",
